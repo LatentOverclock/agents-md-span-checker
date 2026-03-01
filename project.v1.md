@@ -5,10 +5,10 @@
 - Must run in modern desktop/mobile browsers.
 
 ## Functional Requirements
-1. User can enter a group of vectors (generator vectors).
-2. User can enter one or more vectors to test.
-3. App determines for each test vector whether it lies in the span of the group.
-4. App shows a clear yes/no result per test vector.
-5. App provides a short mathematical explanation (rank check).
-6. App works fully client-side (no backend).
-7. App is deployable to GitHub Pages.
+1. User can select a group type (Z, Q, R, Z_n, finite custom table).
+2. App analyzes whether the selected structure is a group.
+3. App shows whether the structure is abelian.
+4. App shows whether the structure is cyclic.
+5. For Z_n, app allows checking if an element is a generator.
+6. For custom finite tables, app validates closure/associativity/identity/inverses.
+7. App is fully client-side and deployable on GitHub Pages.

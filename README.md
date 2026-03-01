@@ -1,19 +1,24 @@
-# agents-md-span-checker
+# agents-md-group-explorer
 
-Frontend-only mathematical app: checks whether input vectors are in the span of a given group of vectors.
+Frontend-only mathematical app to explore algebraic groups.
 
-## Inputs
-- Input 1: vectors to test
-- Input 2: group (generator vectors)
+## Supported group types
+- `Z` under addition
+- `Q` under addition
+- `R` under addition
+- `Z_n` under addition mod `n`
+- Custom finite structure via operation table
 
 ## Output
-- For each test vector: YES/NO whether it is in the span
-- Explanation via rank criterion: `rank(A) == rank([A|v])`
+- Whether the selected structure is a group
+- Whether it is abelian
+- Whether it is cyclic
+- Short explanation/properties
 
 ## agents-md usage
 - `agents-md/` included as git submodule
 - root `agents.md`
 - requirements in `project.md`
 
-## Deploy
-This is static and GitHub Pages ready (serve `index.html` from main branch root).
+## GitHub Pages
+Deploy from `main` branch root.

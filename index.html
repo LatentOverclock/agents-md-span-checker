@@ -3,115 +3,227 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Span Checker</title>
+    <title>Group Explorer</title>
     <style>
       body { font-family: system-ui, sans-serif; margin: 0; background:#0b1020; color:#e9ecf1; }
-      main { max-width: 920px; margin: 0 auto; padding: 1rem; }
+      main { max-width: 980px; margin: 0 auto; padding: 1rem; }
       .card { background:#131a31; border:1px solid #2b385d; border-radius:12px; padding:1rem; margin:1rem 0; }
-      textarea, button { width:100%; box-sizing:border-box; }
-      textarea { min-height:120px; background:#0d1428; color:#e9ecf1; border:1px solid #33466e; border-radius:8px; padding:.6rem; }
+      select, input, button { width:100%; box-sizing:border-box; }
+      input, select { background:#0d1428; color:#e9ecf1; border:1px solid #33466e; border-radius:8px; padding:.55rem; }
       button { background:#2c4ea5; color:white; border:0; border-radius:10px; padding:.7rem; margin-top:.7rem; cursor:pointer; }
-      code, pre { background:#0d1428; border:1px solid #2a3658; border-radius:8px; padding:.6rem; display:block; white-space:pre-wrap; }
-      .ok{color:#7ef0a2}.no{color:#ff9b9b}
+      pre { background:#0d1428; border:1px solid #2a3658; border-radius:8px; padding:.6rem; white-space:pre-wrap; }
+      .grid { display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      .ok{color:#7ef0a2}.no{color:#ff9b9b}.warn{color:#ffd17e}
     </style>
   </head>
   <body>
     <main>
-      <h1>Vector Span Checker</h1>
-      <p>Input 1 = vectors to test. Input 2 = group (generating vectors). Output = whether each vector is in the span of the group.</p>
+      <h1>Algebraic Group Explorer</h1>
+      <p>Explore common groups like <b>Z</b>, <b>Q</b>, <b>R</b>, cyclic groups <b>Zₙ</b>, and finite custom groups.</p>
 
       <section class="card">
-        <h2>Input 2: Group (generators)</h2>
-        <p>One vector per line, comma-separated values. Example:</p>
-        <code>1,0,0
-0,1,0</code>
-        <textarea id="groupInput">1,0,0
-0,1,0</textarea>
+        <h2>Group Type</h2>
+        <select id="groupType">
+          <option value="Z">Z under +</option>
+          <option value="Q">Q under +</option>
+          <option value="R">R under +</option>
+          <option value="Zn">Zₙ under + (mod n)</option>
+          <option value="finite">Custom finite set with operation table</option>
+        </select>
+      </section>
+
+      <section id="znCard" class="card">
+        <h2>Zₙ Settings</h2>
+        <label>n (positive integer)
+          <input id="nInput" type="number" min="1" value="8" />
+        </label>
+        <label>Element to test as generator (optional)
+          <input id="genInput" type="number" value="1" />
+        </label>
+      </section>
+
+      <section id="finiteCard" class="card" style="display:none;">
+        <h2>Custom Finite Group Check</h2>
+        <p>Elements (comma-separated):</p>
+        <input id="elementsInput" value="e,a,b,c" />
+        <p>Operation table (CSV rows, same order as elements):</p>
+        <pre>e,a,b,c
+a,b,c,e
+b,c,e,a
+c,e,a,b</pre>
+        <textarea id="tableInput" style="width:100%;min-height:130px;background:#0d1428;color:#e9ecf1;border:1px solid #33466e;border-radius:8px;padding:.55rem;">e,a,b,c
+a,b,c,e
+b,c,e,a
+c,e,a,b</textarea>
       </section>
 
       <section class="card">
-        <h2>Input 1: Vectors to test</h2>
-        <textarea id="vectorsInput">1,1,0
-0,0,1</textarea>
-        <button id="checkBtn">Check Span</button>
-      </section>
-
-      <section class="card">
-        <h2>Result</h2>
+        <button id="analyzeBtn">Analyze Group</button>
         <div id="result"></div>
       </section>
     </main>
 
     <script>
-      const EPS = 1e-9;
+      const byId = (id) => document.getElementById(id);
+      const gcd = (a,b)=> b===0 ? Math.abs(a) : gcd(b, a%b);
 
-      const parseVectors = (text) => text
-        .split(/\n+/)
-        .map(l => l.trim())
-        .filter(Boolean)
-        .map((line, idx) => {
-          const row = line.split(',').map(x => Number(x.trim()));
-          if (row.some(Number.isNaN)) throw new Error(`Invalid number in line ${idx+1}: "${line}"`);
-          return row;
-        });
-
-      function rank(matrix) {
-        const a = matrix.map(r => r.slice());
-        const m = a.length;
-        const n = a[0]?.length ?? 0;
-        let r = 0;
-        for (let c = 0; c < n && r < m; c++) {
-          let piv = r;
-          for (let i = r + 1; i < m; i++) if (Math.abs(a[i][c]) > Math.abs(a[piv][c])) piv = i;
-          if (Math.abs(a[piv][c]) < EPS) continue;
-          [a[r], a[piv]] = [a[piv], a[r]];
-          const div = a[r][c];
-          for (let j = c; j < n; j++) a[r][j] /= div;
-          for (let i = 0; i < m; i++) {
-            if (i === r) continue;
-            const f = a[i][c];
-            for (let j = c; j < n; j++) a[i][j] -= f * a[r][j];
-          }
-          r++;
+      function analyzePreset(type) {
+        if (type === 'Z' || type === 'Q' || type === 'R') {
+          return {
+            isGroup: true,
+            isAbelian: true,
+            isCyclic: type === 'Z',
+            summary: `${type} under addition is an abelian group${type==='Z'?', and cyclic (generator 1 or -1).':'.'}`,
+            details: [
+              'Operation: +',
+              'Identity: 0',
+              'Inverse of x: -x',
+              type === 'Z' ? 'Cyclic: YES' : 'Cyclic: NO'
+            ]
+          };
         }
-        return r;
+        return null;
       }
 
-      function inSpan(group, v) {
-        const k = group.length;
-        const n = group[0].length;
-        const A = Array.from({length:n}, (_, i) => Array.from({length:k}, (_, j) => group[j][i]));
-        const b = v.slice();
-        const aug = A.map((row,i) => [...row,b[i]]);
-        return { rankA: rank(A), rankAug: rank(aug) };
+      function analyzeZn(n, g) {
+        if (!Number.isInteger(n) || n <= 0) throw new Error('n must be a positive integer.');
+        const isGen = Number.isInteger(g) ? gcd(g, n) === 1 : null;
+        return {
+          isGroup: true,
+          isAbelian: true,
+          isCyclic: true,
+          summary: `Z_${n} under addition mod ${n} is a finite abelian cyclic group.`,
+          details: [
+            'Operation: + mod n',
+            'Identity: 0',
+            `Order: ${n}`,
+            isGen === null ? 'Generator test: skipped' : `Element ${g} is ${isGen ? '' : 'not '}a generator (gcd(${g}, ${n}) ${isGen ? '=' : '≠'} 1).`
+          ]
+        };
       }
 
-      document.getElementById('checkBtn').addEventListener('click', () => {
-        const out = document.getElementById('result');
-        out.innerHTML = '';
-        try {
-          const group = parseVectors(document.getElementById('groupInput').value);
-          const tests = parseVectors(document.getElementById('vectorsInput').value);
-          if (!group.length || !tests.length) throw new Error('Please enter both group and test vectors.');
-          const dim = group[0].length;
-          if (group.some(v => v.length !== dim) || tests.some(v => v.length !== dim)) {
-            throw new Error('All vectors must have the same dimension.');
+      function parseFinite() {
+        const elems = byId('elementsInput').value.split(',').map(s=>s.trim()).filter(Boolean);
+        if (!elems.length) throw new Error('Provide at least one element.');
+        const idx = new Map(elems.map((e,i)=>[e,i]));
+        const rows = byId('tableInput').value.split(/\n+/).map(r=>r.trim()).filter(Boolean).map(r=>r.split(',').map(x=>x.trim()));
+        if (rows.length !== elems.length) throw new Error('Table row count must equal element count.');
+        rows.forEach((r,i)=>{ if (r.length!==elems.length) throw new Error(`Row ${i+1} has wrong length.`); });
+        rows.forEach((r,i)=>r.forEach((v,j)=>{ if(!idx.has(v)) throw new Error(`Unknown element '${v}' in row ${i+1}, col ${j+1}.`);}));
+        return { elems, rows, idx };
+      }
+
+      function analyzeFinite() {
+        const { elems, rows, idx } = parseFinite();
+        const n = elems.length;
+
+        const closure = true; // already checked in parse
+
+        let identity = null;
+        for (const e of elems) {
+          const k = idx.get(e);
+          let ok = true;
+          for (let a=0;a<n;a++) {
+            if (rows[k][a]!==elems[a] || rows[a][k]!==elems[a]) { ok=false; break; }
           }
+          if (ok) { identity = e; break; }
+        }
 
-          let txt = '';
-          tests.forEach((v, i) => {
-            const {rankA, rankAug} = inSpan(group, v);
-            const ok = rankA === rankAug;
-            txt += `v${i+1} = [${v.join(', ')}] -> ${ok ? 'YES' : 'NO'}\n`;
-            txt += `  rank(A)=${rankA}, rank([A|v])=${rankAug} => ${ok ? 'in span' : 'not in span'}\n\n`;
-          });
-          const pre = document.createElement('pre');
-          pre.textContent = txt;
-          out.appendChild(pre);
+        let inverses = true;
+        if (identity !== null) {
+          const id = identity;
+          for (let a=0;a<n;a++) {
+            let found = false;
+            for (let b=0;b<n;b++) {
+              if (rows[a][b]===id && rows[b][a]===id) { found = true; break; }
+            }
+            if (!found) { inverses=false; break; }
+          }
+        } else inverses = false;
+
+        let assoc = true;
+        for (let a=0;a<n && assoc;a++) for (let b=0;b<n && assoc;b++) for (let c=0;c<n;c++) {
+          const left = rows[idx.get(rows[a][b])][c];
+          const right = rows[a][idx.get(rows[b][c])];
+          if (left !== right) { assoc = false; break; }
+        }
+
+        let abelian = true;
+        for (let a=0;a<n && abelian;a++) for (let b=0;b<n;b++) {
+          if (rows[a][b]!==rows[b][a]) { abelian=false; break; }
+        }
+
+        const isGroup = closure && identity !== null && inverses && assoc;
+
+        // cyclic check (if group)
+        let cyclic = false;
+        let generator = null;
+        if (isGroup) {
+          for (let s=0;s<n && !cyclic;s++) {
+            const g = elems[s];
+            let current = identity;
+            const seen = new Set([current]);
+            for (let k=0;k<n*2;k++) {
+              current = rows[idx.get(current)][s];
+              seen.add(current);
+            }
+            if (seen.size===n) { cyclic=true; generator=g; }
+          }
+        }
+
+        return {
+          isGroup,
+          isAbelian: isGroup && abelian,
+          isCyclic: isGroup && cyclic,
+          summary: isGroup ? 'This finite structure is a group.' : 'This finite structure is NOT a group.',
+          details: [
+            `Closure: ${closure ? 'YES' : 'NO'}`,
+            `Associativity: ${assoc ? 'YES' : 'NO'}`,
+            `Identity: ${identity ?? 'none'}`,
+            `Inverse for each element: ${inverses ? 'YES' : 'NO'}`,
+            `Abelian: ${isGroup && abelian ? 'YES' : 'NO'}`,
+            `Cyclic: ${isGroup && cyclic ? `YES (e.g. generator ${generator})` : 'NO'}`
+          ]
+        };
+      }
+
+      function render(res) {
+        const out = byId('result');
+        out.innerHTML = '';
+        const p = document.createElement('p');
+        p.className = res.isGroup ? 'ok' : 'no';
+        p.textContent = res.summary;
+        const pre = document.createElement('pre');
+        pre.textContent = res.details.join('\n');
+        out.appendChild(p);
+        out.appendChild(pre);
+      }
+
+      function run() {
+        const type = byId('groupType').value;
+        try {
+          if (type === 'Zn') {
+            const n = Number(byId('nInput').value);
+            const g = Number(byId('genInput').value);
+            render(analyzeZn(n, g));
+          } else if (type === 'finite') {
+            render(analyzeFinite());
+          } else {
+            render(analyzePreset(type));
+          }
         } catch (e) {
+          const out = byId('result');
           out.innerHTML = `<p class="no">${e.message}</p>`;
         }
+      }
+
+      byId('groupType').addEventListener('change', () => {
+        const t = byId('groupType').value;
+        byId('znCard').style.display = (t === 'Zn') ? 'block' : 'none';
+        byId('finiteCard').style.display = (t === 'finite') ? 'block' : 'none';
       });
+      byId('analyzeBtn').addEventListener('click', run);
+      run();
     </script>
   </body>
 </html>
