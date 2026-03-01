@@ -1,19 +1,27 @@
 # agents-md-group-explorer
 
-Frontend-only mathematical app to explore algebraic groups.
+Frontend-only mathematical app to explore many algebraic groups and operations.
 
-## Supported group types
-- `Z` under addition
-- `Q` under addition
-- `R` under addition
-- `Z_n` under addition mod `n`
-- Custom finite structure via operation table
+## Included group families
+- Integers `Z`
+- Rationals `Q`
+- Reals `R`
+- Cyclic groups `C_n`
+- Unit groups `U(n)`
+- Dihedral groups `D_n`
+- Symmetric groups `S_n`
+- Klein four-group `V4`
+- Quaternion group `Q8`
+- Free abelian groups `Z^r`
+- Free groups `F_r` (with word reduction)
+- Custom finite structure via Cayley table
 
 ## Output
-- Whether the selected structure is a group
-- Whether it is abelian
-- Whether it is cyclic
-- Short explanation/properties
+- Group status and key properties
+- Abelian / cyclic status
+- Operation description and order
+- For free groups: word reduction
+- For custom finite structures: closure/associativity/identity/inverse checks
 
 ## agents-md usage
 - `agents-md/` included as git submodule

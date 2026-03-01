@@ -3,62 +3,81 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Group Explorer</title>
+    <title>Group & Operation Explorer</title>
     <style>
       body { font-family: system-ui, sans-serif; margin: 0; background:#0b1020; color:#e9ecf1; }
-      main { max-width: 980px; margin: 0 auto; padding: 1rem; }
+      main { max-width: 1050px; margin: 0 auto; padding: 1rem; }
       .card { background:#131a31; border:1px solid #2b385d; border-radius:12px; padding:1rem; margin:1rem 0; }
-      select, input, button { width:100%; box-sizing:border-box; }
-      input, select { background:#0d1428; color:#e9ecf1; border:1px solid #33466e; border-radius:8px; padding:.55rem; }
-      button { background:#2c4ea5; color:white; border:0; border-radius:10px; padding:.7rem; margin-top:.7rem; cursor:pointer; }
-      pre { background:#0d1428; border:1px solid #2a3658; border-radius:8px; padding:.6rem; white-space:pre-wrap; }
       .grid { display:grid; gap:.8rem; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+      select, input, textarea, button { width:100%; box-sizing:border-box; }
+      input, select, textarea { background:#0d1428; color:#e9ecf1; border:1px solid #33466e; border-radius:8px; padding:.55rem; }
+      button { background:#2c4ea5; color:white; border:0; border-radius:10px; padding:.7rem; margin-top:.7rem; cursor:pointer; }
+      code, pre { background:#0d1428; border:1px solid #2a3658; border-radius:8px; padding:.6rem; display:block; white-space:pre-wrap; }
       .ok{color:#7ef0a2}.no{color:#ff9b9b}.warn{color:#ffd17e}
+      .muted{opacity:.85}
     </style>
   </head>
   <body>
     <main>
-      <h1>Algebraic Group Explorer</h1>
-      <p>Explore common groups like <b>Z</b>, <b>Q</b>, <b>R</b>, cyclic groups <b>Zₙ</b>, and finite custom groups.</p>
+      <h1>Group & Operation Explorer</h1>
+      <p>
+        Explore basic and special groups (cyclic, abelian, free abelian, free group, symmetric, dihedral, and more)
+        and inspect their operations/properties.
+      </p>
 
       <section class="card">
-        <h2>Group Type</h2>
-        <select id="groupType">
-          <option value="Z">Z under +</option>
-          <option value="Q">Q under +</option>
-          <option value="R">R under +</option>
-          <option value="Zn">Zₙ under + (mod n)</option>
-          <option value="finite">Custom finite set with operation table</option>
-        </select>
-      </section>
+        <h2>Group Family</h2>
+        <div class="grid">
+          <label>Family
+            <select id="family">
+              <option value="Z">Integers Z</option>
+              <option value="Q">Rationals Q</option>
+              <option value="R">Reals R</option>
+              <option value="Cn">Cyclic group Cₙ</option>
+              <option value="Un">Unit group U(n)</option>
+              <option value="Dn">Dihedral group Dₙ</option>
+              <option value="Sn">Symmetric group Sₙ</option>
+              <option value="V4">Klein four-group V₄</option>
+              <option value="Q8">Quaternion group Q₈</option>
+              <option value="freeAbelian">Free abelian group Zʳ</option>
+              <option value="freeGroup">Free group Fᵣ</option>
+              <option value="finiteTable">Custom finite structure (table)</option>
+            </select>
+          </label>
 
-      <section id="znCard" class="card">
-        <h2>Zₙ Settings</h2>
-        <label>n (positive integer)
-          <input id="nInput" type="number" min="1" value="8" />
-        </label>
-        <label>Element to test as generator (optional)
-          <input id="genInput" type="number" value="1" />
-        </label>
+          <label id="paramNWrap">n
+            <input id="paramN" type="number" min="1" value="8" />
+          </label>
+
+          <label id="paramRWrap" style="display:none;">rank r
+            <input id="paramR" type="number" min="1" value="2" />
+          </label>
+
+          <label id="operationWrap">Operation
+            <select id="operation"></select>
+          </label>
+        </div>
       </section>
 
       <section id="finiteCard" class="card" style="display:none;">
-        <h2>Custom Finite Group Check</h2>
+        <h2>Custom Finite Structure Input</h2>
         <p>Elements (comma-separated):</p>
         <input id="elementsInput" value="e,a,b,c" />
         <p>Operation table (CSV rows, same order as elements):</p>
-        <pre>e,a,b,c
-a,b,c,e
-b,c,e,a
-c,e,a,b</pre>
-        <textarea id="tableInput" style="width:100%;min-height:130px;background:#0d1428;color:#e9ecf1;border:1px solid #33466e;border-radius:8px;padding:.55rem;">e,a,b,c
+        <textarea id="tableInput" style="min-height:130px;">e,a,b,c
 a,b,c,e
 b,c,e,a
 c,e,a,b</textarea>
       </section>
 
+      <section id="freeWordCard" class="card" style="display:none;">
+        <h2>Free Group Word Reduction (Fᵣ)</h2>
+        <p class="muted">Use lowercase as generator, uppercase as inverse. Example: <code>abBAcC</code></p>
+        <input id="wordInput" value="abBAcC" />
+      </section>
+
       <section class="card">
-        <button id="analyzeBtn">Analyze Group</button>
+        <button id="analyzeBtn">Analyze</button>
         <div id="result"></div>
       </section>
     </main>
@@ -66,40 +85,32 @@ c,e,a,b</textarea>
     <script>
       const byId = (id) => document.getElementById(id);
       const gcd = (a,b)=> b===0 ? Math.abs(a) : gcd(b, a%b);
+      const factorial = (n) => { let x=1; for(let i=2;i<=n;i++) x*=i; return x; };
 
-      function analyzePreset(type) {
-        if (type === 'Z' || type === 'Q' || type === 'R') {
-          return {
-            isGroup: true,
-            isAbelian: true,
-            isCyclic: type === 'Z',
-            summary: `${type} under addition is an abelian group${type==='Z'?', and cyclic (generator 1 or -1).':'.'}`,
-            details: [
-              'Operation: +',
-              'Identity: 0',
-              'Inverse of x: -x',
-              type === 'Z' ? 'Cyclic: YES' : 'Cyclic: NO'
-            ]
-          };
+      const OPS = {
+        Z: ['+'],
+        Q: ['+', '* (Q\\{0})'],
+        R: ['+', '* (R\\{0})'],
+        Cn: ['+ mod n'],
+        Un: ['* mod n (units only)'],
+        Dn: ['composition of symmetries'],
+        Sn: ['composition of permutations'],
+        V4: ['component-wise XOR / addition mod 2'],
+        Q8: ['quaternion multiplication'],
+        freeAbelian: ['vector addition'],
+        freeGroup: ['word concatenation + reduction'],
+        finiteTable: ['custom Cayley table']
+      };
+
+      function setOperations() {
+        const fam = byId('family').value;
+        const opSel = byId('operation');
+        opSel.innerHTML = '';
+        for (const op of (OPS[fam] || [])) {
+          const el = document.createElement('option');
+          el.value = op; el.textContent = op;
+          opSel.appendChild(el);
         }
-        return null;
-      }
-
-      function analyzeZn(n, g) {
-        if (!Number.isInteger(n) || n <= 0) throw new Error('n must be a positive integer.');
-        const isGen = Number.isInteger(g) ? gcd(g, n) === 1 : null;
-        return {
-          isGroup: true,
-          isAbelian: true,
-          isCyclic: true,
-          summary: `Z_${n} under addition mod ${n} is a finite abelian cyclic group.`,
-          details: [
-            'Operation: + mod n',
-            'Identity: 0',
-            `Order: ${n}`,
-            isGen === null ? 'Generator test: skipped' : `Element ${g} is ${isGen ? '' : 'not '}a generator (gcd(${g}, ${n}) ${isGen ? '=' : '≠'} 1).`
-          ]
-        };
       }
 
       function parseFinite() {
@@ -113,33 +124,26 @@ c,e,a,b</textarea>
         return { elems, rows, idx };
       }
 
-      function analyzeFinite() {
+      function analyzeFiniteTable() {
         const { elems, rows, idx } = parseFinite();
         const n = elems.length;
-
-        const closure = true; // already checked in parse
 
         let identity = null;
         for (const e of elems) {
           const k = idx.get(e);
           let ok = true;
-          for (let a=0;a<n;a++) {
-            if (rows[k][a]!==elems[a] || rows[a][k]!==elems[a]) { ok=false; break; }
-          }
+          for (let a=0;a<n;a++) if (rows[k][a]!==elems[a] || rows[a][k]!==elems[a]) { ok=false; break; }
           if (ok) { identity = e; break; }
         }
 
-        let inverses = true;
-        if (identity !== null) {
-          const id = identity;
+        let inverses = identity !== null;
+        if (inverses) {
           for (let a=0;a<n;a++) {
             let found = false;
-            for (let b=0;b<n;b++) {
-              if (rows[a][b]===id && rows[b][a]===id) { found = true; break; }
-            }
+            for (let b=0;b<n;b++) if (rows[a][b]===identity && rows[b][a]===identity) { found=true; break; }
             if (!found) { inverses=false; break; }
           }
-        } else inverses = false;
+        }
 
         let assoc = true;
         for (let a=0;a<n && assoc;a++) for (let b=0;b<n && assoc;b++) for (let c=0;c<n;c++) {
@@ -149,81 +153,152 @@ c,e,a,b</textarea>
         }
 
         let abelian = true;
-        for (let a=0;a<n && abelian;a++) for (let b=0;b<n;b++) {
-          if (rows[a][b]!==rows[b][a]) { abelian=false; break; }
-        }
+        for (let a=0;a<n && abelian;a++) for (let b=0;b<n;b++) if (rows[a][b]!==rows[b][a]) { abelian=false; break; }
 
-        const isGroup = closure && identity !== null && inverses && assoc;
-
-        // cyclic check (if group)
-        let cyclic = false;
-        let generator = null;
-        if (isGroup) {
-          for (let s=0;s<n && !cyclic;s++) {
-            const g = elems[s];
-            let current = identity;
-            const seen = new Set([current]);
-            for (let k=0;k<n*2;k++) {
-              current = rows[idx.get(current)][s];
-              seen.add(current);
-            }
-            if (seen.size===n) { cyclic=true; generator=g; }
-          }
-        }
+        const isGroup = identity !== null && inverses && assoc;
 
         return {
-          isGroup,
-          isAbelian: isGroup && abelian,
-          isCyclic: isGroup && cyclic,
-          summary: isGroup ? 'This finite structure is a group.' : 'This finite structure is NOT a group.',
-          details: [
-            `Closure: ${closure ? 'YES' : 'NO'}`,
-            `Associativity: ${assoc ? 'YES' : 'NO'}`,
+          title: 'Custom finite structure',
+          summary: isGroup ? 'This is a group.' : 'This is NOT a group.',
+          lines: [
+            `Operation: custom table`,
+            `Finite order: ${n}`,
+            `Associative: ${assoc ? 'YES':'NO'}`,
             `Identity: ${identity ?? 'none'}`,
-            `Inverse for each element: ${inverses ? 'YES' : 'NO'}`,
-            `Abelian: ${isGroup && abelian ? 'YES' : 'NO'}`,
-            `Cyclic: ${isGroup && cyclic ? `YES (e.g. generator ${generator})` : 'NO'}`
-          ]
+            `Inverse for each element: ${inverses ? 'YES':'NO'}`,
+            `Abelian: ${isGroup && abelian ? 'YES':'NO'}`
+          ],
+          ok: isGroup
         };
+      }
+
+      function reduceFreeWord(word) {
+        const stack = [];
+        for (const ch of word.replace(/\s+/g,'')) {
+          const top = stack[stack.length-1];
+          if (top && top !== ch && top.toLowerCase() === ch.toLowerCase()) stack.pop();
+          else stack.push(ch);
+        }
+        return stack.join('') || 'e';
+      }
+
+      function analyzeFamily() {
+        const fam = byId('family').value;
+        const n = Number(byId('paramN').value);
+        const r = Number(byId('paramR').value);
+
+        switch (fam) {
+          case 'Z':
+            return { title:'Z', summary:'Integers under + form an abelian infinite cyclic group.', ok:true,
+              lines:['Operation: +','Identity: 0','Inverse of x: -x','Abelian: YES','Cyclic: YES (generator 1 or -1)','Order: infinite'] };
+          case 'Q':
+            return {
+              title:'Q', ok:true,
+              summary: byId('operation').value.startsWith('*') ? 'Q\\{0} under multiplication is an abelian group.' : 'Q under addition is an abelian group.',
+              lines: byId('operation').value.startsWith('*')
+                ? ['Operation: × on nonzero rationals','Identity: 1','Inverse of x: 1/x','Abelian: YES','Cyclic: NO','Order: infinite']
+                : ['Operation: +','Identity: 0','Inverse of x: -x','Abelian: YES','Cyclic: NO','Order: infinite']
+            };
+          case 'R':
+            return {
+              title:'R', ok:true,
+              summary: byId('operation').value.startsWith('*') ? 'R\\{0} under multiplication is an abelian group.' : 'R under addition is an abelian group.',
+              lines: byId('operation').value.startsWith('*')
+                ? ['Operation: × on nonzero reals','Identity: 1','Inverse of x: 1/x','Abelian: YES','Cyclic: NO','Order: infinite']
+                : ['Operation: +','Identity: 0','Inverse of x: -x','Abelian: YES','Cyclic: NO','Order: infinite']
+            };
+          case 'Cn':
+            if (!Number.isInteger(n) || n <= 0) throw new Error('For C_n, n must be positive integer.');
+            return { title:`C_${n}`, ok:true, summary:`C_${n} is cyclic (isomorphic to Z_${n}).`,
+              lines:[`Operation: + mod ${n}`,'Identity: 0',`Order: ${n}`,'Abelian: YES','Cyclic: YES'] };
+          case 'Un':
+            if (!Number.isInteger(n) || n <= 1) throw new Error('For U(n), n must be integer > 1.');
+            const units = [];
+            for (let k=1;k<n;k++) if (gcd(k,n)===1) units.push(k);
+            const isUnitGroupCyclic = (() => {
+              // U(n) cyclic iff n = 1,2,4,p^k,2p^k for odd prime p
+              if ([1, 2, 4].includes(n)) return true;
+              let m = n;
+              const fac = [];
+              for (let p = 2; p * p <= m; p++) {
+                let c = 0;
+                while (m % p === 0) { m /= p; c++; }
+                if (c) fac.push([p, c]);
+              }
+              if (m > 1) fac.push([m, 1]);
+
+              const oddPrimePower = fac.length === 1 && fac[0][0] % 2 === 1;
+              const twoTimesOddPrimePower =
+                fac.length === 2 &&
+                fac.some(([p, c]) => p === 2 && c === 1) &&
+                fac.some(([p]) => p % 2 === 1);
+
+              return oddPrimePower || twoTimesOddPrimePower;
+            })();
+
+            return { title:`U(${n})`, ok:true, summary:`Units modulo ${n} under multiplication form a finite abelian group.`,
+              lines:[`Operation: × mod ${n} on units`,`Elements: {${units.join(', ')}}`,`Order: ${units.length}`,'Abelian: YES',`Cyclic: ${isUnitGroupCyclic ? 'YES' : 'NO (in general)'}`] };
+          case 'Dn':
+            if (!Number.isInteger(n) || n < 2) throw new Error('For D_n, use integer n >= 2.');
+            return { title:`D_${n}`, ok:true, summary:`Dihedral group D_${n} (symmetries of n-gon).`,
+              lines:['Operation: composition','Identity: identity symmetry',`Order: ${2*n}`,`Abelian: ${n<=2?'YES':'NO'}`,`Cyclic: ${n<=2?'YES':'NO'}`] };
+          case 'Sn':
+            if (!Number.isInteger(n) || n < 1 || n > 7) throw new Error('For S_n use 1 <= n <= 7 (UI bound).');
+            return { title:`S_${n}`, ok:true, summary:`Symmetric group S_${n} on ${n} symbols.`,
+              lines:['Operation: permutation composition','Identity: id permutation',`Order: ${factorial(n)}`,`Abelian: ${n<=2?'YES':'NO'}`,`Cyclic: ${n<=2?'YES':'NO'}`] };
+          case 'V4':
+            return { title:'V4', ok:true, summary:'Klein four-group V4 is abelian but not cyclic.',
+              lines:['Operation: component-wise + mod 2','Identity: (0,0)','Order: 4','Abelian: YES','Cyclic: NO'] };
+          case 'Q8':
+            return { title:'Q8', ok:true, summary:'Quaternion group Q8 is non-abelian.',
+              lines:['Operation: quaternion multiplication','Identity: 1','Order: 8','Abelian: NO','Cyclic: NO'] };
+          case 'freeAbelian':
+            if (!Number.isInteger(r) || r < 1) throw new Error('For free abelian group, rank r >= 1.');
+            return { title:`Z^${r}`, ok:true, summary:`Free abelian group of rank ${r}.`,
+              lines:['Operation: vector addition','Identity: zero vector','Order: infinite','Abelian: YES',`Cyclic: ${r===1?'YES':'NO'}`] };
+          case 'freeGroup':
+            if (!Number.isInteger(r) || r < 1) throw new Error('For free group, rank r >= 1.');
+            const w = byId('wordInput').value || '';
+            const reduced = reduceFreeWord(w);
+            return { title:`F_${r}`, ok:true, summary:`Free group of rank ${r}.`,
+              lines:['Operation: word concatenation + reduction','Identity: empty word e','Order: infinite',`Abelian: ${r===1?'YES':'NO'}`,`Cyclic: ${r===1?'YES':'NO'}`,`Word reduction: ${w || '(empty)'} -> ${reduced}`] };
+          case 'finiteTable':
+            return analyzeFiniteTable();
+          default:
+            throw new Error('Unknown family');
+        }
       }
 
       function render(res) {
         const out = byId('result');
         out.innerHTML = '';
+        const h = document.createElement('h3');
+        h.textContent = res.title;
         const p = document.createElement('p');
-        p.className = res.isGroup ? 'ok' : 'no';
+        p.className = res.ok ? 'ok' : 'no';
         p.textContent = res.summary;
         const pre = document.createElement('pre');
-        pre.textContent = res.details.join('\n');
-        out.appendChild(p);
-        out.appendChild(pre);
+        pre.textContent = res.lines.join('\n');
+        out.append(h, p, pre);
       }
 
-      function run() {
-        const type = byId('groupType').value;
-        try {
-          if (type === 'Zn') {
-            const n = Number(byId('nInput').value);
-            const g = Number(byId('genInput').value);
-            render(analyzeZn(n, g));
-          } else if (type === 'finite') {
-            render(analyzeFinite());
-          } else {
-            render(analyzePreset(type));
-          }
-        } catch (e) {
-          const out = byId('result');
-          out.innerHTML = `<p class="no">${e.message}</p>`;
-        }
+      function updateUI() {
+        const fam = byId('family').value;
+        setOperations();
+        byId('paramNWrap').style.display = ['Cn','Un','Dn','Sn'].includes(fam) ? 'block' : 'none';
+        byId('paramRWrap').style.display = ['freeAbelian','freeGroup'].includes(fam) ? 'block' : 'none';
+        byId('finiteCard').style.display = fam === 'finiteTable' ? 'block' : 'none';
+        byId('freeWordCard').style.display = fam === 'freeGroup' ? 'block' : 'none';
       }
 
-      byId('groupType').addEventListener('change', () => {
-        const t = byId('groupType').value;
-        byId('znCard').style.display = (t === 'Zn') ? 'block' : 'none';
-        byId('finiteCard').style.display = (t === 'finite') ? 'block' : 'none';
+      byId('family').addEventListener('change', updateUI);
+      byId('analyzeBtn').addEventListener('click', () => {
+        try { render(analyzeFamily()); }
+        catch (e) { byId('result').innerHTML = `<p class='no'>${e.message}</p>`; }
       });
-      byId('analyzeBtn').addEventListener('click', run);
-      run();
+
+      updateUI();
+      byId('analyzeBtn').click();
     </script>
   </body>
 </html>
