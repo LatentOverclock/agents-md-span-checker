@@ -12,7 +12,7 @@ Frontend-only mathematical app to explore many algebraic groups and operations.
 - Symmetric groups `S_n`
 - Klein four-group `V4`
 - Quaternion group `Q8`
-- Free abelian groups `Z^r`
+- Free abelian groups `Z^r` (with basis check)
 - Free groups `F_r` (with word reduction)
 - Custom finite structure via Cayley table
 
