@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Span Checker</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; background:#0b1020; color:#e9ecf1; }
+      main { max-width: 920px; margin: 0 auto; padding: 1rem; }
+      .card { background:#131a31; border:1px solid #2b385d; border-radius:12px; padding:1rem; margin:1rem 0; }
+      textarea, button { width:100%; box-sizing:border-box; }
+      textarea { min-height:120px; background:#0d1428; color:#e9ecf1; border:1px solid #33466e; border-radius:8px; padding:.6rem; }
+      button { background:#2c4ea5; color:white; border:0; border-radius:10px; padding:.7rem; margin-top:.7rem; cursor:pointer; }
+      code, pre { background:#0d1428; border:1px solid #2a3658; border-radius:8px; padding:.6rem; display:block; white-space:pre-wrap; }
+      .ok{color:#7ef0a2}.no{color:#ff9b9b}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Vector Span Checker</h1>
+      <p>Input 1 = vectors to test. Input 2 = group (generating vectors). Output = whether each vector is in the span of the group.</p>
+
+      <section class="card">
+        <h2>Input 2: Group (generators)</h2>
+        <p>One vector per line, comma-separated values. Example:</p>
+        <code>1,0,0
+0,1,0</code>
+        <textarea id="groupInput">1,0,0
+0,1,0</textarea>
+      </section>
+
+      <section class="card">
+        <h2>Input 1: Vectors to test</h2>
+        <textarea id="vectorsInput">1,1,0
+0,0,1</textarea>
+        <button id="checkBtn">Check Span</button>
+      </section>
+
+      <section class="card">
+        <h2>Result</h2>
+        <div id="result"></div>
+      </section>
+    </main>
+
+    <script>
+      const EPS = 1e-9;
+
+      const parseVectors = (text) => text
+        .split(/\n+/)
+        .map(l => l.trim())
+        .filter(Boolean)
+        .map((line, idx) => {
+          const row = line.split(',').map(x => Number(x.trim()));
+          if (row.some(Number.isNaN)) throw new Error(`Invalid number in line ${idx+1}: "${line}"`);
+          return row;
+        });
+
+      function rank(matrix) {
+        const a = matrix.map(r => r.slice());
+        const m = a.length;
+        const n = a[0]?.length ?? 0;
+        let r = 0;
+        for (let c = 0; c < n && r < m; c++) {
+          let piv = r;
+          for (let i = r + 1; i < m; i++) if (Math.abs(a[i][c]) > Math.abs(a[piv][c])) piv = i;
+          if (Math.abs(a[piv][c]) < EPS) continue;
+          [a[r], a[piv]] = [a[piv], a[r]];
+          const div = a[r][c];
+          for (let j = c; j < n; j++) a[r][j] /= div;
+          for (let i = 0; i < m; i++) {
+            if (i === r) continue;
+            const f = a[i][c];
+            for (let j = c; j < n; j++) a[i][j] -= f * a[r][j];
+          }
+          r++;
+        }
+        return r;
+      }
+
+      function inSpan(group, v) {
+        const k = group.length;
+        const n = group[0].length;
+        const A = Array.from({length:n}, (_, i) => Array.from({length:k}, (_, j) => group[j][i]));
+        const b = v.slice();
+        const aug = A.map((row,i) => [...row,b[i]]);
+        return { rankA: rank(A), rankAug: rank(aug) };
+      }
+
+      document.getElementById('checkBtn').addEventListener('click', () => {
+        const out = document.getElementById('result');
+        out.innerHTML = '';
+        try {
+          const group = parseVectors(document.getElementById('groupInput').value);
+          const tests = parseVectors(document.getElementById('vectorsInput').value);
+          if (!group.length || !tests.length) throw new Error('Please enter both group and test vectors.');
+          const dim = group[0].length;
+          if (group.some(v => v.length !== dim) || tests.some(v => v.length !== dim)) {
+            throw new Error('All vectors must have the same dimension.');
+          }
+
+          let txt = '';
+          tests.forEach((v, i) => {
+            const {rankA, rankAug} = inSpan(group, v);
+            const ok = rankA === rankAug;
+            txt += `v${i+1} = [${v.join(', ')}] -> ${ok ? 'YES' : 'NO'}\n`;
+            txt += `  rank(A)=${rankA}, rank([A|v])=${rankAug} => ${ok ? 'in span' : 'not in span'}\n\n`;
+          });
+          const pre = document.createElement('pre');
+          pre.textContent = txt;
+          out.appendChild(pre);
+        } catch (e) {
+          out.innerHTML = `<p class="no">${e.message}</p>`;
+        }
+      });
+    </script>
+  </body>
+</html>
